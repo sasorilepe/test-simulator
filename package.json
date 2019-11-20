@@ -1,0 +1,17 @@
+{
+  "name": "test-simulator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Alfredo Alvarado Lepe",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "jszip": "^3.2.2",
+    "rimraf": "^3.0.0"
+  }
+}

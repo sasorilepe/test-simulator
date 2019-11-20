@@ -1,0 +1,13 @@
+#page-content-wrapper .container-fluid{
+  padding: 20px 25px;
+}
+
+#question-state {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+}
+
+.selected-question {
+  background-color: #2e6ca6 !important;
+}
