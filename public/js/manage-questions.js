@@ -1,12 +1,9 @@
 const questionContainer = document.getElementById('questionContainer');
 
-const getId = questionFile => questionFile.split('.')[0];
+const postQuestion = (questionId, questionFile, isInstalling) => {
 
-const postQuestion = (questionFile, isInstalling) => {
-
-  const url = isInstalling ? 'install-question' : 'uninstall-question';
-  const data = { zipFile: questionFile };
-  const questionId = getId(questionFile);
+  const url = isInstalling ? 'api/install-question' : 'api/uninstall-question';
+  const data = isInstalling ? { zipFile: questionFile } : { questionId };
 
   fetch(url, {
     method: 'POST',
@@ -52,21 +49,21 @@ const toggleSpinner = (questionId, isInstalling, showSpinner) => {
 
 const uninstallQuestion = event => {
   toggleSpinner(event.target.dataset.questionId, false, true);
-  postQuestion(event.target.dataset.questionFile, false);
+  postQuestion(event.target.dataset.questionId, event.target.dataset.questionFile, false);
 };
 
 const installQuestion = event => {
   toggleSpinner(event.target.dataset.questionId, true, true);
-  postQuestion(event.target.dataset.questionFile, true);
+  postQuestion(event.target.dataset.questionId, event.target.dataset.questionFile, true);
 };
 
 const showQuestions = questions => {
 
   for (const question of questions) {
 
-    const questionFile = question.question;
-    const questionTitle = getTitle(questionFile);
-    const questionId = getId(questionFile);
+    const questionFile = question.zipFile;
+    const questionTitle = question.challengeData.name;
+    const questionId = question.challengeData.id;
 
     const questionCard = document.createElement('div');
     questionCard.id = questionId;
@@ -111,7 +108,4 @@ const showQuestions = questions => {
   }
 };
 
-window.addEventListener('load', () => {
-
-  getQuestions(showQuestions);
-});
+window.addEventListener('load', () => getQuestions(showQuestions));

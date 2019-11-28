@@ -4,6 +4,13 @@ const fs = require('fs');
 const JSZip = require('JSZip');
 const questionService = require('../services/QuestionService');
 
+const checkIfIdIsValid = id => {
+  const numericId = parseInt(id);
+  return (new Date(numericId)).getTime() > 0;
+};
+
+const checkIfEmptyString = str => str.replace(/\s+/g, '').length;
+
 const checkIfExists = file => fs.existsSync(file);
 
 const checkIfIsZip = file => {
@@ -11,64 +18,108 @@ const checkIfIsZip = file => {
   return file.match(regex);
 };
 
-const checkIfZipIsValid = async (file) => {
+const checkIfChallengeFileIsValid = async (zip) => {
 
-  const content = fs.readFileSync(questionService.resourcesPath + file);
+  const filesInZip = Object.keys(zip.files);
 
-  return await JSZip.loadAsync(content)
-    .then(zip => {
-      const filesInZip = Object.keys(zip.files);
-      for (const fileInZip of filesInZip) {
-        if (fileInZip === 'challenge.json') {
-          return true;
+  return await zip.file('challenge.json').async('nodebuffer')
+    .then(data => {
+
+      const parsedData = data.toString();
+      const parsedJSON = JSON.parse(parsedData);
+
+      const challengePaths = parsedJSON.backend;
+      const challengeName = parsedJSON.name;
+
+      if (!checkIfIdIsValid(parsedJSON.id)) {
+        return false;
+      }
+
+      if (typeof challengeName != 'string' || !checkIfEmptyString(challengeName)) {
+        return false;
+      }
+
+      if (Array.isArray(challengePaths)) {
+
+        for (const path of challengePaths) {
+          if (!filesInZip.includes(path)) {
+            return false;
+          }
         }
       }
-      return false;
+      else {
+        return false;
+      }
+
+      return parsedJSON;
     })
+    .catch(questionService.logError);
+};
+
+const checkIfZipIsValid = async (zipFile) => {
+
+  const content = fs.readFileSync(questionService.resourcesPath + zipFile);
+
+  return await JSZip.loadAsync(content)
+    .then(async (zipData) => await checkIfChallengeFileIsValid(zipData))
     .catch(questionService.logError);
 }
 
-const checkIfInstalled = file => {
-  const folder = file.split('.')[0];
+const checkIfInstalled = folder => {
   const folderPath = questionService.challengesPath + folder;
-  return checkIfExists(folderPath);
+  const itExists = checkIfExists(folderPath);
+  return itExists;
+};
+
+const editQuestion = questionId => {
+  return questionService.editQuestion(questionId);
 };
 
 const getValidQuestions = async () => {
 
-  const questions = questionService.getAllQuestions();
-  const validQuestions = [];
-  for (const question of questions) {
-    if (checkIfIsZip(question)) {
-      if (await checkIfZipIsValid(question)) {
-        const validQuestion = {
-          question,
-          installed: checkIfInstalled(question)
+  const zipFiles = questionService.getAllQuestions();
+  const validZipFiles = [];
+
+  for (const zipFile of zipFiles) {
+
+    if (checkIfIsZip(zipFile)) {
+
+      const challengeData = await checkIfZipIsValid(zipFile);
+
+      if (challengeData) {
+
+        const isInstalled = checkIfInstalled(challengeData.id);
+        const jsonFile = isInstalled ? questionService.getChallengeDataFromId(challengeData.id) : challengeData;
+
+        const validZipFile = {
+          zipFile,
+          installed: isInstalled,
+          challengeData: jsonFile
         };
-        validQuestions.push(validQuestion);
+
+        validZipFiles.push(validZipFile);
       }
     }
   }
-  return validQuestions;
+  return validZipFiles;
 };
 
-const deleteQuestion = question => {
-  if (!checkIfExists(questionService.resourcesPath + question)) {
+const deleteQuestion = zipFile => {
+  if (!checkIfExists(questionService.resourcesPath + zipFile)) {
     return {
       status: 404,
       error: 'The question does not exist'
     };
   }
-  questionService.deleteQuestion(question);
+  questionService.deleteQuestion(zipFile);
   return {
     status: 200,
     message: "The question was succesfully deleted"
   };
 };
 
-const uninstallQuestion = question => {
-  const folder = question.split('.')[0];
-  const path = questionService.challengesPath + folder + '/';
+const uninstallQuestion = questionId => {
+  const path = questionService.challengesPath + questionId + '/';
   if (!checkIfExists(path)) {
     return {
       status: 404,
@@ -95,13 +146,16 @@ const installQuestion = async (zipFile) => {
       error: 'This file is not a zip'
     };
   }
-  if (! await checkIfZipIsValid(zipFile)) {
+
+  const challengeData = await checkIfZipIsValid(zipFile);
+
+  if (!challengeData) {
     return {
       status: 400,
-      error: 'This zip file does not have a "challenge.json" inside it'
+      error: 'This zip file does not have a "challenge.json" or it is not valid'
     };
   }
-  if (checkIfInstalled(zipFile)) {
+  if (checkIfInstalled(challengeData.id)) {
     return {
       status: 400,
       error: 'This challenge was previously installed'
@@ -115,5 +169,6 @@ module.exports = {
   getValidQuestions,
   installQuestion,
   deleteQuestion,
-  uninstallQuestion
+  uninstallQuestion,
+  editQuestion
 };

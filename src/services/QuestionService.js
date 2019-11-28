@@ -1,9 +1,41 @@
 const fs = require('fs');
 const JSZip = require('JSZip');
 const rimraf = require('rimraf');
+const exec = require('child_process').exec;
 
 const resourcesPath = './public/resources/';
 const challengesPath = './public/challenges/';
+
+const getChallengeDataFromId = questionId => {
+
+  const filepath = `${challengesPath}${questionId}/challenge.json`;
+  const data = fs.readFileSync(filepath);
+  return JSON.parse(data);
+};
+
+const getChallengeDataFromZip = async (zipFile) => {
+
+  const content = fs.readFileSync(resourcesPath + zipFile);
+
+  return await JSZip.loadAsync(content)
+    .then(async (zip) => {
+
+      return await zip.file('challenge.json').async('nodebuffer')
+        .then(data => {
+
+          const parsedData = data.toString();
+          const parsedJSON = JSON.parse(parsedData);
+          return parsedJSON;
+        })
+        .catch(logError);
+    })
+    .catch(logError);
+}
+
+const getFolderFromZip = async (zipFile) => {
+  const challengeData = await getChallengeDataFromZip(zipFile);
+  return challengeData.id.toString();
+};
 
 const logError = err => {
   console.error(err);
@@ -18,7 +50,7 @@ const uninstallQuestion = questionDir => rimraf.sync(questionDir);
 
 const installQuestion = async (questionFile) => {
 
-  const folderToUnzip = questionFile.split('.')[0];
+  const folderToUnzip = await getFolderFromZip(questionFile);
   const pathToUnzip = challengesPath + folderToUnzip + '/';
 
   const zip = new JSZip();
@@ -70,6 +102,8 @@ const installQuestion = async (questionFile) => {
   }
 };
 
+const editQuestion = filePath => exec('code ' + challengesPath + filePath);
+
 module.exports = {
   getAllQuestions,
   installQuestion,
@@ -77,5 +111,7 @@ module.exports = {
   logError,
   resourcesPath,
   challengesPath,
-  uninstallQuestion
+  uninstallQuestion,
+  editQuestion,
+  getChallengeDataFromId
 };

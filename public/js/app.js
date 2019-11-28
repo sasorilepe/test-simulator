@@ -8,19 +8,14 @@ const readResponseAsText = res => res.text();
 
 const validateResponse = res => {
   if (!res.ok) {
+    showAlert(res.statusText, true);
     throw Error(res.error);
   }
   return res;
 };
 
-const getTitle = zipFile => {
-  const filename = zipFile.split('.')[0];
-  const title = filename.charAt(0).toUpperCase() + filename.slice(1);
-  return title;
-};
-
 const getQuestions = callback => {
-  return fetch('questions')
+  return fetch('api/questions')
     .then(validateResponse)
     .then(readResponseAsJSON)
     .then(callback)

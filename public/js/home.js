@@ -11,33 +11,44 @@ const openApp = event => {
   window.open(codePath, '_blank');
 };
 
-const setLastSelected = questionFile => {
-  const question = questionFile.split('.')[0];
+const editCode = event => {
+  fetch('api/edit-question', {
+    method: 'POST',
+    body: JSON.stringify({
+      questionId: event.target.dataset.questionId
+    }),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(validateResponse)
+    .catch(logError);
+};
+
+const setLastSelected = questionId => {
   const url = window.location.href;
   const param = url.split('?challenge=')[1];
   if (param === undefined) {
     return;
   }
-  else if (param === question) {
-    localStorage.setItem('lastSelected', questionFile);
+  else if (param.toString() === questionId.toString()) {
+    localStorage.setItem('lastSelected', questionId);
   }
 };
 
-const getInstructionsPath = zipFile => {
-  const folder = zipFile.split('.')[0];
-  const path = `challenges/${folder}/instructions/index.html`;
+const getInstructionsPath = questionId => {
+  const path = `challenges/${questionId}/instructions/index.html`;
   return path;
 };
 
-const getCodePath = zipFile => {
-  const folder = zipFile.split('.')[0];
-  const path = `challenges/${folder}/code/index.html`;
+const getCodePath = questionId => {
+  const path = `challenges/${questionId}/code/index.html`;
   return path;
 };
 
 const selectSidebarOption = event => {
 
-  const selected = event.target.dataset.question;
+  const selected = event.target.dataset.questionId;
   const options = document.getElementsByClassName('list-group-item');
 
   for (const option of options) {
@@ -62,13 +73,13 @@ const showQuestions = questions => {
 
   for (const question of questions) {
 
-    setLastSelected(question.question);
-
+    const questionId = question.challengeData.id;
     const questionLink = document.createElement('a');
-    const questionTitle = getTitle(question.question);
+    const questionTitle = question.challengeData.name;
     const questionNode = document.createTextNode(questionTitle);
     const lastSelected = localStorage.getItem('lastSelected');
-    const paramUrl = question.question.split('.')[0];
+
+    setLastSelected(questionId);
 
     questionLink.appendChild(questionNode);
     questionLink.href = 'javascript:void(0);';
@@ -79,33 +90,49 @@ const showQuestions = questions => {
         'list-group-item',
         'list-group-item-action',
         'bg-light');
-      questionLink.dataset.question = question.question;
+      questionLink.dataset.questionId = questionId;
+      questionLink.dataset.title = questionTitle;
       questionLink.dataset.loaded = false;
 
       questionLink.addEventListener('click', async (event) => {
 
         questionState.classList.remove('d-none');
 
-        window.history.pushState('param', 'param', '?challenge=' + paramUrl);
+        window.history.pushState(
+          'param',
+          'param',
+          `http://${window.location.host}?challenge=${questionId}`
+        );
 
-        const state = localStorage.getItem(event.target.dataset.question) === 'true';
-        const zipFile = event.target.dataset.question;
+        const state = localStorage.getItem(event.target.dataset.questionId) === 'true';
 
         if (event.target.dataset.instructions === undefined) {
 
-          const instructionsPath = getInstructionsPath(zipFile);
-          event.target.dataset.instructions = await getInstructions(instructionsPath);
+          const instructionsPath = getInstructionsPath(questionId);
+          event.target.dataset.instructions = await getInstructions(
+            instructionsPath,
+            event.target.dataset.title
+          );
         }
 
         questionContainer.innerHTML = event.target.dataset.instructions;
 
         const viewPageBtn = questionContainer.getElementsByClassName('btn-primary')[0];
 
-        viewPageBtn.dataset.codePath = getCodePath(zipFile);
+        viewPageBtn.dataset.codePath = getCodePath(questionId);
 
         viewPageBtn.addEventListener(
           'click',
           openApp
+        );
+
+        const editCodeBtn = questionContainer.getElementsByClassName('btn-success')[0];
+
+        editCodeBtn.dataset.questionId = questionId;
+
+        editCodeBtn.addEventListener(
+          'click',
+          editCode
         );
 
         selectSidebarOption(event);
@@ -128,17 +155,22 @@ const showQuestions = questions => {
       sidebar.appendChild(questionLink);
     }
 
-    if (lastSelected === question.question) {
+    if (lastSelected.toString() === questionId.toString()) {
       questionLink.click();
     }
   }
 };
 
-const getInstructions = async (url) => {
-  return await fetch(url)
+const getInstructions = async (url, title = 'ok') => {
+
+  const header = `<h1>${title}</h1><hr>`;
+
+  const instructions = await fetch(url)
     .then(validateResponse)
     .then(readResponseAsText)
     .catch('<b>Not found</b>')
+
+  return header + instructions;
 };
 
 const showDashboard = event => {
@@ -146,7 +178,7 @@ const showDashboard = event => {
   questionState.classList.add('d-none');
   dashboard.classList.remove('d-none')
   selectSidebarOption(event);
-  window.history.pushState('param', 'param', '?dashboard');
+  window.history.pushState('param', 'param', 'dashboard');
 };
 
 const changeQuestionState = () => {
