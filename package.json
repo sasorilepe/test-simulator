@@ -12,7 +12,7 @@
   "dependencies": {
     "ejs": "^2.7.4",
     "express": "^4.17.1",
-    "jszip": "^3.2.2",
+    "jszip": "^3.8.0",
     "rimraf": "^3.0.0"
   }
 }
